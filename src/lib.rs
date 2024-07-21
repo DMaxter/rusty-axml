@@ -43,6 +43,21 @@ pub struct ManifestContents {
     pub main_entry_point: Option<String>,
 }
 
+/// A component can be exported or enabled. Each of these feature have default values
+/// but these default values can be overriden by the developer. This means they have
+/// essentially four states:
+///     * default to `true`,
+///     * default to `false`,
+///     * explicitely set to `true`,
+///     * explicitely set to `false`
+#[derive(Debug, PartialEq)]
+pub enum ComponentState {
+    DefaultTrue,
+    DefaultFalse,
+    ExplicitTrue,
+    ExplicitFalse,
+}
+
 /// Open the file, read the contents, and create a `Cursor` of the raw data
 /// for easier handling when parsing the XML data.
 fn create_cursor(file_path: &str) -> Cursor<Vec<u8>> {
@@ -169,7 +184,91 @@ fn get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) -> ManifestContents {
 }
 
 /// Convenience function to parse the manifest of an APK
-pub fn parse_app_manifest(file_path: &str) -> ManifestContents {
-    let cursor = create_cursor(file_path);
-    get_manifest_contents(cursor)
+pub fn parse_app_manifest(file_path: &str) -> Cursor<Vec<u8>> {
+    create_cursor(file_path)
 }
+
+/// Parse an app's manifest and get the list of exposed components
+pub fn get_exposed_components(mut axml_cursor: Cursor<Vec<u8>>) -> String {
+    let mut components = HashMap::<String, HashMap<String, ComponentState>>::new();
+
+    let mut global_strings = Vec::new();
+    let mut namespace_prefixes = HashMap::<String, String>::new();
+
+    loop {
+        if let Ok(block_type) = XmlTypes::parse_block_type(&mut axml_cursor) {
+            match block_type {
+                XmlTypes::ResNullType => continue,
+                XmlTypes::ResStringPoolType => {
+                    let _ = StringPool::from_buff(&mut axml_cursor, &mut global_strings);
+                },
+                XmlTypes::ResTableType => {
+                    let _ = ResTable::parse(&mut axml_cursor);
+                },
+                XmlTypes::ResXmlType => {
+                    axml_cursor.set_position(axml_cursor.position() - 2);
+                    let _ = ChunkHeader::from_buff(&mut axml_cursor, XmlTypes::ResXmlType);
+                },
+                XmlTypes::ResXmlStartNamespaceType => {
+                    parser::parse_start_namespace(&mut axml_cursor, &global_strings, &mut namespace_prefixes);
+                },
+                XmlTypes::ResXmlEndNamespaceType => {
+                    parser::parse_end_namespace(&mut axml_cursor, &global_strings);
+                },
+                XmlTypes::ResXmlStartElementType => {
+                    let (element_type, attrs) = parser::parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
+                    // Get element name from the attributes
+                    // We only care about package name, activites, services, content providers and
+                    // broadcast receivers which all have their name in the "android" namespace
+                    let mut element_name = String::new();
+                    let mut enabled = ComponentState::DefaultTrue;
+                    let mut exported = ComponentState::DefaultFalse;
+
+                    for (attr_key, attr_val) in attrs.iter() {
+                        if attr_key == "android:name" {
+                            element_name = attr_val.to_string();
+                        }
+
+                        if attr_key == "android:enabled" {
+                            enabled = match attr_val.as_str() {
+                                "true" => ComponentState::ExplicitTrue,
+                                "false" => ComponentState::ExplicitFalse,
+                                _ => panic!("Invalid boolean value"),
+                            }
+                        }
+
+                        if attr_key == "android:exported" {
+                            exported = match attr_val.as_str() {
+                                "true" => ComponentState::ExplicitTrue,
+                                "false" => ComponentState::ExplicitFalse,
+                                _ => panic!("Invalid boolean value"),
+                            }
+                        }
+                    }
+
+                    println!("{element_name}: enabled {enabled:?} | exported {exported:?}\n");
+                    components.insert(element_name, HashMap::from([
+                        (String::from("enabled"), enabled),
+                        (String::from("exported"), exported),
+                    ]));
+                },
+                XmlTypes::ResXmlEndElementType => {
+                    parser::parse_end_element(&mut axml_cursor, &global_strings).unwrap();
+                },
+
+                XmlTypes::ResXmlResourceMapType => {
+                    let _ = ResourceMap::from_buff(&mut axml_cursor);
+                },
+
+                _ => { },
+            }
+        }
+        else  {
+            break;
+        }
+    }
+
+    // FIXME
+    String::new()
+}
+
