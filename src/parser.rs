@@ -38,11 +38,11 @@ pub fn parse_start_namespace(axml_buff: &mut Cursor<Vec<u8>>,
     axml_buff.set_position(offset - 2);
 
     /* Parse chunk header */
-    let header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlStartNamespaceType)
+    let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlStartNamespaceType)
                  .expect("Error: cannot get header from start namespace chunk");
 
-    let line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let comment = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _comment = axml_buff.read_u32::<LittleEndian>().unwrap();
     let prefix = axml_buff.read_u32::<LittleEndian>().unwrap();
     let uri = axml_buff.read_u32::<LittleEndian>().unwrap();
 
@@ -52,19 +52,19 @@ pub fn parse_start_namespace(axml_buff: &mut Cursor<Vec<u8>>,
 }
 
 pub fn parse_end_namespace(axml_buff: &mut Cursor<Vec<u8>>,
-                           strings: &[String]) {
+                           _strings: &[String]) {
     /* Go back 2 bytes, to account from the block type */
     let offset = axml_buff.position();
     axml_buff.set_position(offset - 2);
 
     /* Parse chunk header */
-    let header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlEndNamespaceType)
+    let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlEndNamespaceType)
                  .expect("Error: cannot get header from start namespace chunk");
 
-    let line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let comment = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let prefix = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let uri = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _comment = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _prefix = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _uri = axml_buff.read_u32::<LittleEndian>().unwrap();
 }
 
 pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
@@ -75,18 +75,18 @@ pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
     axml_buff.set_position(offset - 2);
 
     /* Parse chunk header */
-    let header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlStartElementType)
+    let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlStartElementType)
                  .expect("Error: cannot get header from start namespace chunk");
 
-    let line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let comment = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let namespace = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _comment = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _namespace = axml_buff.read_u32::<LittleEndian>().unwrap();
     let name = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let attribute_size = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _attribute_size = axml_buff.read_u32::<LittleEndian>().unwrap();
     let attribute_count = axml_buff.read_u16::<LittleEndian>().unwrap();
-    let id_index = axml_buff.read_u16::<LittleEndian>().unwrap();
-    let class_index = axml_buff.read_u16::<LittleEndian>().unwrap();
-    let style_index = axml_buff.read_u16::<LittleEndian>().unwrap();
+    let _id_index = axml_buff.read_u16::<LittleEndian>().unwrap();
+    let _class_index = axml_buff.read_u16::<LittleEndian>().unwrap();
+    let _style_index = axml_buff.read_u16::<LittleEndian>().unwrap();
 
     let mut decoded_attrs = Vec::<(String, String)>::new();
     for _ in 0..attribute_count {
@@ -172,12 +172,12 @@ pub fn parse_end_element(axml_buff: &mut Cursor<Vec<u8>>,
     axml_buff.set_position(offset - 2);
 
     /* Parse chunk header */
-    let header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlEndElementType)
+    let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlEndElementType)
                  .expect("Error: cannot get header from start namespace chunk");
 
-    let line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let comment = axml_buff.read_u32::<LittleEndian>().unwrap();
-    let namespace = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _comment = axml_buff.read_u32::<LittleEndian>().unwrap();
+    let _namespace = axml_buff.read_u32::<LittleEndian>().unwrap();
     let name = axml_buff.read_u32::<LittleEndian>().unwrap();
 
     Ok(strings.get(name as usize).unwrap().to_string())
@@ -231,7 +231,7 @@ pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> String{
     let mut global_strings = Vec::new();
     let mut namespace_prefixes = HashMap::<String, String>::new();
 
-    let mut root = Rc::new(RefCell::new(XmlElement {
+    let root = Rc::new(RefCell::new(XmlElement {
         element_type: "manifest".to_string(),
         attributes: HashMap::new(),
         children: Vec::new()

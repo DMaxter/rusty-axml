@@ -41,7 +41,7 @@ impl ResTable {
         axml_buff.set_position(initial_offset - 2);
 
         /* Parse chunk header */
-        let header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResTableType)
+        let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResTableType)
                      .expect("Error: cannot get chunk header from string pool");
 
         /* Get package count */

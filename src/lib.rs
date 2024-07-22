@@ -16,12 +16,11 @@ use std::io::{
     Read,
     Cursor,
 };
-use crate::cli::ArgType;
+
 use crate::chunk_header::ChunkHeader;
 use crate::resource_map::ResourceMap;
 use crate::res_table::{
-    ResTable,
-    ResTablePackage
+    ResTable
 };
 use crate::string_pool::StringPool;
 use crate::xml_types::XmlTypes;
@@ -92,7 +91,7 @@ pub fn create_cursor(file_path: &str) -> Cursor<Vec<u8>> {
     Cursor::new(axml_cursor)
 }
 
-pub fn get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) {
+pub fn get_manifest_contents(axml_cursor: Cursor<Vec<u8>>) {
     parser::parse_xml(axml_cursor);
 }
 
@@ -221,7 +220,7 @@ pub fn get_exposed_components(mut axml_cursor: Cursor<Vec<u8>>) -> String {
                     parser::parse_end_namespace(&mut axml_cursor, &global_strings);
                 },
                 XmlTypes::ResXmlStartElementType => {
-                    let (element_type, attrs) = parser::parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
+                    let (_element_type, attrs) = parser::parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
 
                     
                     // Get element name from the attributes
