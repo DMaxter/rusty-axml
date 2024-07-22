@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 use std::borrow::Cow;
+use std::rc::Rc;
+use std::cell::RefCell;
 use std::io::{
     Error,
     Cursor,
@@ -19,7 +21,14 @@ use crate::xml_types::XmlTypes;
 use crate::chunk_header::ChunkHeader;
 use crate::data_value_type::DataValueType;
 use crate::res_value::ResValue;
+use crate::{ ResourceMap, StringPool, ResTable };
 
+#[derive(Debug)]
+struct XmlElement {
+    element_type: String,
+    attributes: HashMap<String, String>,
+    children: Vec<Rc<RefCell<XmlElement>>>,
+}
 
 pub fn parse_start_namespace(axml_buff: &mut Cursor<Vec<u8>>,
                              strings: &[String],
@@ -139,6 +148,23 @@ pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
     Ok((strings.get(name as usize).unwrap().to_string(), decoded_attrs))
 }
 
+pub fn NEW_parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
+                               strings: &[String],
+                               namespace_prefixes: &HashMap::<String, String>) -> XmlElement {
+    let (element_type, attrs) = parse_start_element(axml_buff, strings, namespace_prefixes).unwrap();
+    let mut attributes = HashMap::new();
+    for (key, value) in attrs.iter() {
+        attributes.insert(key.to_string(), value.to_string());
+    }
+
+    XmlElement {
+        element_type,
+        attributes,
+        children: Vec::new()
+    }
+}
+
+
 pub fn parse_end_element(axml_buff: &mut Cursor<Vec<u8>>,
                          strings: &[String]) -> Result<String, Error> {
     /* Go back 2 bytes, to account from the block type */
@@ -199,4 +225,76 @@ pub fn handle_event<T> (writer: &mut Writer<T>,
         },
         _ => println!("{:02X}, other", block_type),
     }
+}
+
+pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> String{
+    let mut global_strings = Vec::new();
+    let mut namespace_prefixes = HashMap::<String, String>::new();
+
+    let mut root = Rc::new(RefCell::new(XmlElement {
+        element_type: "manifest".to_string(),
+        attributes: HashMap::new(),
+        children: Vec::new()
+    }));
+    let mut stack = vec![Rc::clone(&root)];
+    // let mut stack: Vec<Rc<RefCell<XmlElement>>> = Vec::new();
+
+    loop {
+        if let Ok(block_type) = XmlTypes::parse_block_type(&mut axml_cursor) {
+            match block_type {
+                XmlTypes::ResNullType => continue,
+                XmlTypes::ResStringPoolType => {
+                    let _ = StringPool::from_buff(&mut axml_cursor, &mut global_strings);
+                },
+                XmlTypes::ResTableType => {
+                    let _ = ResTable::parse(&mut axml_cursor);
+                },
+                XmlTypes::ResXmlType => {
+                    axml_cursor.set_position(axml_cursor.position() - 2);
+                    let _ = ChunkHeader::from_buff(&mut axml_cursor, XmlTypes::ResXmlType);
+                },
+                XmlTypes::ResXmlStartNamespaceType => {
+                    println!("START NAMESPACE");
+                    parse_start_namespace(&mut axml_cursor, &global_strings, &mut namespace_prefixes);
+                },
+                XmlTypes::ResXmlEndNamespaceType => {
+                    println!("END NAMESPACE");
+                    parse_end_namespace(&mut axml_cursor, &global_strings);
+                },
+                XmlTypes::ResXmlStartElementType => {
+                    // let (element_type, attrs) = parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
+                    let element = NEW_parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes);
+                    println!("{element:?}");
+
+                    if element.element_type == "manifest" {
+                        stack.last().unwrap().borrow_mut().attributes = element.attributes.clone();
+                    } else {
+                        let new_element = Rc::new(RefCell::new(element));
+                        stack.last().unwrap().borrow_mut().children.push(Rc::clone(&new_element));
+                        stack.push(new_element);
+                    }
+
+                },
+                XmlTypes::ResXmlEndElementType => {
+                    let element_name = parse_end_element(&mut axml_cursor, &global_strings).unwrap();
+                    println!("END ELEMENT {element_name}");
+                    stack.pop();
+                },
+
+                XmlTypes::ResXmlResourceMapType => {
+                    let _ = ResourceMap::from_buff(&mut axml_cursor);
+                },
+
+                _ => { },
+            }
+        }
+        else  {
+            break;
+        }
+    }
+
+    println!("{root:#?}");
+
+
+    String::new()
 }

@@ -60,7 +60,7 @@ pub enum ComponentState {
 
 /// Open the file, read the contents, and create a `Cursor` of the raw data
 /// for easier handling when parsing the XML data.
-fn create_cursor(file_path: &str) -> Cursor<Vec<u8>> {
+pub fn create_cursor(file_path: &str) -> Cursor<Vec<u8>> {
 
     let mut axml_cursor = Vec::new();
 
@@ -92,6 +92,10 @@ fn create_cursor(file_path: &str) -> Cursor<Vec<u8>> {
     Cursor::new(axml_cursor)
 }
 
+pub fn get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) {
+    parser::parse_xml(axml_cursor);
+}
+
 /// Parse an app's manifest and extract interesting contents
 /// For now, only these elements are extracted, although that
 /// list might get longer in the future:
@@ -101,7 +105,7 @@ fn create_cursor(file_path: &str) -> Cursor<Vec<u8>> {
 ///   * list of services names
 ///   * list of content providers names
 ///   * list of broadcast receiver names
-fn get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) -> ManifestContents {
+fn REAL_get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) -> ManifestContents {
     let mut contents = ManifestContents::default();
 
     let mut global_strings = Vec::new();
@@ -191,6 +195,7 @@ pub fn parse_app_manifest(file_path: &str) -> Cursor<Vec<u8>> {
 /// Parse an app's manifest and get the list of exposed components
 pub fn get_exposed_components(mut axml_cursor: Cursor<Vec<u8>>) -> String {
     let mut components = HashMap::<String, HashMap<String, ComponentState>>::new();
+    let mut last_element_name = String::new();
 
     let mut global_strings = Vec::new();
     let mut namespace_prefixes = HashMap::<String, String>::new();
@@ -217,6 +222,8 @@ pub fn get_exposed_components(mut axml_cursor: Cursor<Vec<u8>>) -> String {
                 },
                 XmlTypes::ResXmlStartElementType => {
                     let (element_type, attrs) = parser::parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
+
+                    
                     // Get element name from the attributes
                     // We only care about package name, activites, services, content providers and
                     // broadcast receivers which all have their name in the "android" namespace
@@ -246,11 +253,12 @@ pub fn get_exposed_components(mut axml_cursor: Cursor<Vec<u8>>) -> String {
                         }
                     }
 
-                    println!("{element_name}: enabled {enabled:?} | exported {exported:?}\n");
-                    components.insert(element_name, HashMap::from([
+                    components.insert(element_name.clone(), HashMap::from([
                         (String::from("enabled"), enabled),
                         (String::from("exported"), exported),
                     ]));
+
+                    last_element_name = element_name.clone();
                 },
                 XmlTypes::ResXmlEndElementType => {
                     parser::parse_end_element(&mut axml_cursor, &global_strings).unwrap();

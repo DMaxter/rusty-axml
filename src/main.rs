@@ -29,10 +29,11 @@ fn main() {
 
     // Check the file type
     let arg_type = args.get_arg_type();
+    // FIXME unused
     let arg_path = args.get_arg_path();
 
     // Create cursor over input file contents
-    let mut axml_cursor = create_cursor(arg_type, &arg_path);
+    let mut axml_cursor = create_cursor(&arg_path);
 
     let mut global_strings = Vec::new();
     let mut namespace_prefixes = HashMap::<String, String>::new();
