@@ -59,16 +59,9 @@ pub enum ComponentState {
 
 /// Open the file, read the contents, and create a `Cursor` of the raw data
 /// for easier handling when parsing the XML data.
-pub fn create_cursor(file_path: &str) -> Cursor<Vec<u8>> {
+pub fn create_cursor(file_path: &str, arg_type: cli::ArgType) -> Cursor<Vec<u8>> {
 
     let mut axml_cursor = Vec::new();
-
-    let arg_type = match file_path.split(".").last() {
-        Some("apk") => cli::ArgType::Apk,
-        Some("xml") => cli::ArgType::Axml,
-        Some("arsc") => cli::ArgType::Arsc,
-        _ => panic!("Cannot infer file type from path"),
-    };
 
     if arg_type == cli::ArgType::Apk {
         // If we are dealing with an APK, we must first extract the binary XML from it
@@ -188,7 +181,7 @@ fn REAL_get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) -> ManifestConte
 
 /// Convenience function to parse the manifest of an APK
 pub fn parse_app_manifest(file_path: &str) -> Cursor<Vec<u8>> {
-    create_cursor(file_path)
+    create_cursor(file_path, cli::ArgType::Apk)
 }
 
 /// Parse an app's manifest and get the list of exposed components

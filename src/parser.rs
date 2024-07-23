@@ -1,3 +1,8 @@
+//! Main parser routine
+//!
+//! This module contains the logic to parse the binary XML into a tree structure (`XmlElement`),
+//! representing the actual XML.
+
 use std::collections::HashMap;
 use std::borrow::Cow;
 use std::rc::Rc;
@@ -23,10 +28,14 @@ use crate::data_value_type::DataValueType;
 use crate::res_value::ResValue;
 use crate::{ ResourceMap, StringPool, ResTable };
 
+/// Representation of an XML element with optional children
 #[derive(Debug)]
 struct XmlElement {
+    /// Type of element (e.g., `activity`, `service`)
     element_type: String,
+    /// Attributes of the element (e.g., `exported`, `permission`)
     attributes: HashMap<String, String>,
+    /// Vector of children of the XML element
     children: Vec<Rc<RefCell<XmlElement>>>,
 }
 
