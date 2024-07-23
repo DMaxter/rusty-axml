@@ -30,7 +30,7 @@ use crate::{ ResourceMap, StringPool, ResTable };
 
 /// Representation of an XML element with optional children
 #[derive(Debug)]
-struct XmlElement {
+pub struct XmlElement {
     /// Type of element (e.g., `activity`, `service`)
     element_type: String,
     /// Attributes of the element (e.g., `exported`, `permission`)
@@ -236,7 +236,7 @@ pub fn handle_event<T> (writer: &mut Writer<T>,
     }
 }
 
-pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> String{
+pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> Rc<RefCell<XmlElement>> {
     let mut global_strings = Vec::new();
     let mut namespace_prefixes = HashMap::<String, String>::new();
 
@@ -263,17 +263,14 @@ pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> String{
                     let _ = ChunkHeader::from_buff(&mut axml_cursor, XmlTypes::ResXmlType);
                 },
                 XmlTypes::ResXmlStartNamespaceType => {
-                    println!("START NAMESPACE");
                     parse_start_namespace(&mut axml_cursor, &global_strings, &mut namespace_prefixes);
                 },
                 XmlTypes::ResXmlEndNamespaceType => {
-                    println!("END NAMESPACE");
                     parse_end_namespace(&mut axml_cursor, &global_strings);
                 },
                 XmlTypes::ResXmlStartElementType => {
                     // let (element_type, attrs) = parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
                     let element = NEW_parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes);
-                    println!("{element:?}");
 
                     if element.element_type == "manifest" {
                         stack.last().unwrap().borrow_mut().attributes = element.attributes.clone();
@@ -286,7 +283,6 @@ pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> String{
                 },
                 XmlTypes::ResXmlEndElementType => {
                     let element_name = parse_end_element(&mut axml_cursor, &global_strings).unwrap();
-                    println!("END ELEMENT {element_name}");
                     stack.pop();
                 },
 
@@ -302,8 +298,5 @@ pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> String{
         }
     }
 
-    println!("{root:#?}");
-
-
-    String::new()
+    root
 }

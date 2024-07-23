@@ -16,6 +16,8 @@ use std::io::{
     Read,
     Cursor,
 };
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use crate::chunk_header::ChunkHeader;
 use crate::resource_map::ResourceMap;
@@ -24,6 +26,7 @@ use crate::res_table::{
 };
 use crate::string_pool::StringPool;
 use crate::xml_types::XmlTypes;
+use crate::parser::XmlElement;
 
 /// Representation of an app's manifest contents
 #[derive(Debug, Default)]
@@ -84,8 +87,8 @@ pub fn create_cursor(file_path: &str, arg_type: cli::ArgType) -> Cursor<Vec<u8>>
     Cursor::new(axml_cursor)
 }
 
-pub fn get_manifest_contents(axml_cursor: Cursor<Vec<u8>>) {
-    parser::parse_xml(axml_cursor);
+pub fn get_manifest_contents(axml_cursor: Cursor<Vec<u8>>) -> Rc<RefCell<XmlElement>> {
+    parser::parse_xml(axml_cursor)
 }
 
 /// Parse an app's manifest and extract interesting contents
