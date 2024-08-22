@@ -11,17 +11,17 @@ use std::io::{
 
 use quick_xml::Writer;
 
-use axml_parser::create_cursor;
-use axml_parser::chunk_header::ChunkHeader;
-use axml_parser::resource_map::ResourceMap;
-use axml_parser::res_table::{
+use rusty_axml::create_cursor;
+use rusty_axml::chunk_header::ChunkHeader;
+use rusty_axml::resource_map::ResourceMap;
+use rusty_axml::res_table::{
     ResTable,
     ResTablePackage
 };
-use axml_parser::string_pool::StringPool;
-use axml_parser::xml_types::XmlTypes;
-use axml_parser::parser;
-use axml_parser::cli;
+use rusty_axml::string_pool::StringPool;
+use rusty_axml::xml_types::XmlTypes;
+use rusty_axml::parser;
+use rusty_axml::cli;
 
 fn main() {
     // Check CLI arguments
