@@ -2,7 +2,12 @@
 name = "axml_parser"
 version = "0.1.0"
 authors = ["Julien Gamba <julien@jgamba.eu>"]
-edition = "2018"
+edition = "2021"
+license = "Apache-2.0"
+description = "A parser for Android AXML files"
+homepage = "https://github.com/rusty-rs/rusty-axml"
+repository = "https://github.com/rusty-rs/rusty-axml"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
