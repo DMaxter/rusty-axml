@@ -32,11 +32,11 @@ use crate::{ ResourceMap, StringPool, ResTable };
 #[derive(Debug)]
 pub struct XmlElement {
     /// Type of element (e.g., `activity`, `service`)
-    element_type: String,
+    pub element_type: String,
     /// Attributes of the element (e.g., `exported`, `permission`)
-    attributes: HashMap<String, String>,
+    pub attributes: HashMap<String, String>,
     /// Vector of children of the XML element
-    children: Vec<Rc<RefCell<XmlElement>>>,
+    pub children: Vec<Rc<RefCell<XmlElement>>>,
 }
 
 pub fn parse_start_namespace(axml_buff: &mut Cursor<Vec<u8>>,
