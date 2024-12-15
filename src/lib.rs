@@ -1,4 +1,3 @@
-pub mod cli;
 pub mod parser;
 pub mod xml_types;
 pub mod chunk_header;
@@ -61,29 +60,48 @@ pub enum ComponentState {
     ExplicitFalse,
 }
 
-/// Open the file, read the contents, and create a `Cursor` of the raw data
+/// Open an APK, read the contents, and create a `Cursor` of the raw data
 /// for easier handling when parsing the XML data.
-pub fn create_cursor(file_path: &str, arg_type: cli::ArgType) -> Cursor<Vec<u8>> {
+/// This function expects `file_path` to point to an APK (or really, any valid
+/// zip file that contains a file named `AndroidManifest.xml`).
+/// To read an AXML file directly use [`create_cursor_from_axml`] instead.
+///
+/// [`create_cursor_from_axml`]: fn.create_cursor_from_axml.html
+pub fn create_cursor_from_apk(file_path: &str) -> Cursor<Vec<u8>> {
 
     let mut axml_cursor = Vec::new();
 
-    if arg_type == cli::ArgType::Apk {
-        // If we are dealing with an APK, we must first extract the binary XML from it
-        // In this case we assume the user wants to decode the app manifest so we extract that
-
-        let zipfile = std::fs::File::open(file_path).unwrap();
-        let mut archive = zip::ZipArchive::new(zipfile).unwrap();
-        let mut raw_file = match archive.by_name("AndroidManifest.xml") {
-            Ok(file) => file,
-            Err(..) => {
-                panic!("Error: no AndroidManifest.xml in APK");
-            }
-        };
-        raw_file.read_to_end(&mut axml_cursor).expect("Error: cannot read manifest from app");
+    let zipfile = std::fs::File::open(file_path).unwrap();
+    let mut archive = zip::ZipArchive::new(zipfile).unwrap();
+    let mut raw_file = match archive.by_name("AndroidManifest.xml") {
+        Ok(file) => file,
+        Err(..) => {
+            panic!("Error: no AndroidManifest.xml in APK");
+        }
+    };
+    raw_file.read_to_end(&mut axml_cursor).expect("Error: cannot read manifest from app");
+    /*
     } else {
         let mut raw_file = fs::File::open(file_path).expect("Error: cannot open AXML file");
         raw_file.read_to_end(&mut axml_cursor).expect("Error: cannot read AXML file");
     }
+    */
+
+    Cursor::new(axml_cursor)
+}
+
+/// Open an AXML file, read the contents, and create a `Cursor` of the raw data
+/// for easier handling when parsing the XML data.
+/// This function expects `file_path` to point to an AXML file.
+/// To read the manifest from an APK file use [`create_cursor_from_apk`] instead.
+///
+/// [`create_cursor_from_apk`]: fn.create_cursor_from_apk.html
+pub fn create_cursor_from_axml(file_path: &str) -> Cursor<Vec<u8>> {
+
+    let mut axml_cursor = Vec::new();
+
+    let mut raw_file = fs::File::open(file_path).expect("Error: cannot open AXML file");
+    raw_file.read_to_end(&mut axml_cursor).expect("Error: cannot read AXML file");
 
     Cursor::new(axml_cursor)
 }
@@ -181,11 +199,6 @@ fn REAL_get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) -> ManifestConte
     }
 
     contents
-}
-
-/// Convenience function to parse the manifest of an APK
-pub fn parse_app_manifest(file_path: &str) -> Cursor<Vec<u8>> {
-    create_cursor(file_path, cli::ArgType::Apk)
 }
 
 /// Use BFS tree traversal to get all element of a given type

@@ -9,10 +9,19 @@ homepage = "https://github.com/rusty-rs/rusty-axml"
 repository = "https://github.com/rusty-rs/rusty-axml"
 readme = "README.md"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "rusty_axml"
+path = "src/lib.rs"
+
+[[bin]]
+name = "axmlparser"
+required-features = ["cli"]
+
+[features]
+cli = ["dep:clap"]
 
 [dependencies]
 byteorder = "1.4.3"
-clap = { version = "4.5.4", features = ["derive"] }
+clap = { version = "4.5.4", features = ["derive"], optional = true }
 quick-xml = "0.31.0"
 zip = "0.5"
