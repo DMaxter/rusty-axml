@@ -2,7 +2,9 @@
 
 //! Representation of a chunk header
 //!
-//! TODO: doc
+//! An AXML document is composed of several chunks, and each chunk has a header.
+//! The header is rather small and only contain the type of the chunk (identified
+//! by the `XmlTypes` enum), the header size, and the chunk size.
 
 use std::io::{
     Error,
@@ -21,17 +23,11 @@ pub struct ChunkHeader {
     /// The meaning of this value depends on the containing chunk.
     pub chunk_type: XmlTypes,
 
-    /// Size of the chunk header (in bytes).
-    /// Adding this value to the address of the chunk allows you to find
-    /// its associated data (if any).
+    /// Size of the chunk header in bytes.
     pub header_size: u16,
 
-    /// Total size of this chunk (in bytes).
-    /// This is the `chunkSize` plus the size of any data associated with the
-    /// chunk. Adding this value to the chunk allows you to completely skip
-    /// its contents (including any child chunks). If this value is the same
-    /// as `chunkSize`, there is no data associated with the chunk
-    pub size: u32,
+    /// Total size of this chunk in bytes.
+    pub chunk_size: u32,
 }
 
 impl ChunkHeader {
@@ -51,25 +47,25 @@ impl ChunkHeader {
 
         // Get chunk header size and total size
         let header_size = axml_buff.read_u16::<LittleEndian>().unwrap();
-        let size = axml_buff.read_u32::<LittleEndian>().unwrap();
+        let chunk_size = axml_buff.read_u32::<LittleEndian>().unwrap();
 
         // Exhaustive checks on the announced sizes
         if header_size < minimum_size {
             panic!("Error: parsed header size is smaller than the minimum");
         }
 
-        if size < minimum_size.into() {
+        if chunk_size < minimum_size.into() {
             panic!("Error: parsed total size is smaller than the minimum");
         }
 
-        if size < header_size.into() {
-            panic!("Error: parsed total size if smaller than parsed header size");
+        if chunk_size < header_size.into() {
+            panic!("Error: parsed total size is smaller than parsed header size");
         }
 
         Ok(ChunkHeader {
             chunk_type,
             header_size,
-            size,
+            chunk_size,
         })
     }
 
@@ -78,7 +74,76 @@ impl ChunkHeader {
         println!("----- Chunk header -----");
         println!("Header chunk_type: {:02X}", self.chunk_type);
         println!("Header header_size: {:02X}", self.header_size);
-        println!("Chunk size: {:04X}", self.size);
+        println!("Chunk size: {:04X}", self.chunk_size);
         println!("----- End chunk header -----");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use XmlTypes;
+
+    #[test]
+    fn test_valid_case() {
+        let valid_data = vec![1, 0, 8, 0, 16, 0, 0, 0];
+        let mut cursor = Cursor::new(valid_data);
+
+        let expected_type = XmlTypes::ResStringPoolType;
+        let result = ChunkHeader::from_buff(&mut cursor, expected_type);
+
+        assert!(result.is_ok());
+        let chunk_header = result.unwrap();
+        assert_eq!(chunk_header.chunk_type, expected_type);
+        assert_eq!(chunk_header.header_size, 8);
+        assert_eq!(chunk_header.chunk_size, 16);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error: unexpected XML chunk type")]
+    fn test_unexpected_chunk_type() {
+        // Prepare a buffer with a chunk type that doesn't match the expected one
+        let invalid_data = vec![2, 0, 8, 0, 16, 0, 0, 0];
+        let mut cursor = Cursor::new(invalid_data);
+
+        let expected_type = XmlTypes::ResStringPoolType;
+        let _ = ChunkHeader::from_buff(&mut cursor, expected_type);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error: parsed header size is smaller than the minimum")]
+    fn test_invalid_header_size() {
+        // Prepare a buffer with a small header size (less than 8)
+        let invalid_data = vec![1, 0, 4, 0, 16, 0, 0, 0];
+        let mut cursor = Cursor::new(invalid_data);
+
+        let expected_type = XmlTypes::ResStringPoolType;
+        let _ = ChunkHeader::from_buff(&mut cursor, expected_type);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error: parsed total size is smaller than the minimum")]
+    fn test_invalid_chunk_size() {
+        // Prepare a buffer with an invalid chunk size (less than 8)
+        let invalid_data = vec![1, 0, 8, 0, 4, 0, 0, 0];
+        let mut cursor = Cursor::new(invalid_data);
+
+        let expected_type = XmlTypes::ResStringPoolType;
+        let _ = ChunkHeader::from_buff(&mut cursor, expected_type);
+    }
+
+    #[test]
+    #[should_panic(expected = "Error: parsed total size is smaller than parsed header size")]
+    fn test_invalid_chunk_size_smaller_than_header() {
+        // Prepare a buffer where chunk size is smaller than header size
+        // Note: the header size is constant and is always 8 bytes which is
+        // the minimum allowed. Since we first check that the header size
+        // and chunk size are now below 8 before comparing the two sizes
+        // this should actually never happen. But we make a test anyway.
+        let invalid_data = vec![1, 0, 16, 0, 8, 0, 0, 0];
+        let mut cursor = Cursor::new(invalid_data);
+
+        let expected_type = XmlTypes::ResStringPoolType;
+        let _ = ChunkHeader::from_buff(&mut cursor, expected_type);
     }
 }

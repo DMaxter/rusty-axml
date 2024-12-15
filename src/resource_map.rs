@@ -38,7 +38,7 @@ impl ResourceMap {
 
         /* Get resources IDs */
         let mut resources_id = Vec::new();
-        let nb_resources = (header.size / 4) - 2;
+        let nb_resources = (header.chunk_size / 4) - 2;
         for _ in 0..nb_resources {
             let id = axml_buff.read_u32::<LittleEndian>().unwrap();
             resources_id.push(id);
