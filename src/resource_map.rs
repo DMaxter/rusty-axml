@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+//! AXML resource maps
+
 use crate::chunk_header::ChunkHeader;
 use crate::xml_types::XmlTypes;
 

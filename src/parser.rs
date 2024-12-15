@@ -39,14 +39,15 @@ pub struct XmlElement {
     pub children: Vec<Rc<RefCell<XmlElement>>>,
 }
 
+/// Parse the start of a namepace
 pub fn parse_start_namespace(axml_buff: &mut Cursor<Vec<u8>>,
                              strings: &[String],
                              namespaces: &mut HashMap::<String, String>) {
-    /* Go back 2 bytes, to account from the block type */
+    // Go back 2 bytes, to account from the block type
     let offset = axml_buff.position();
     axml_buff.set_position(offset - 2);
 
-    /* Parse chunk header */
+    // Parse chunk header
     let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlStartNamespaceType)
                  .expect("Error: cannot get header from start namespace chunk");
 
@@ -60,13 +61,14 @@ pub fn parse_start_namespace(axml_buff: &mut Cursor<Vec<u8>>,
     namespaces.insert(uri_str.to_string(), prefix_str.to_string());
 }
 
+/// Parse the end of a namepace
 pub fn parse_end_namespace(axml_buff: &mut Cursor<Vec<u8>>,
                            _strings: &[String]) {
-    /* Go back 2 bytes, to account from the block type */
+    // Go back 2 bytes, to account from the block type
     let offset = axml_buff.position();
     axml_buff.set_position(offset - 2);
 
-    /* Parse chunk header */
+    // Parse chunk header
     let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlEndNamespaceType)
                  .expect("Error: cannot get header from start namespace chunk");
 
@@ -76,14 +78,15 @@ pub fn parse_end_namespace(axml_buff: &mut Cursor<Vec<u8>>,
     let _uri = axml_buff.read_u32::<LittleEndian>().unwrap();
 }
 
+/// Parser the start of an element
 pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
                            strings: &[String],
                            namespace_prefixes: &HashMap::<String, String>) -> Result<(String, Vec<(String, String)>), Error> {
-    /* Go back 2 bytes, to account from the block type */
+    // Go back 2 bytes, to account from the block type
     let offset = axml_buff.position();
     axml_buff.set_position(offset - 2);
 
-    /* Parse chunk header */
+    // Parse chunk header
     let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlStartElementType)
                  .expect("Error: cannot get header from start namespace chunk");
 
@@ -157,6 +160,7 @@ pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
     Ok((strings.get(name as usize).unwrap().to_string(), decoded_attrs))
 }
 
+/// Parser the start of an element
 pub fn NEW_parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
                                strings: &[String],
                                namespace_prefixes: &HashMap::<String, String>) -> XmlElement {
@@ -174,13 +178,14 @@ pub fn NEW_parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
 }
 
 
+/// Parser the end of an element
 pub fn parse_end_element(axml_buff: &mut Cursor<Vec<u8>>,
                          strings: &[String]) -> Result<String, Error> {
-    /* Go back 2 bytes, to account from the block type */
+    // Go back 2 bytes, to account from the block type
     let offset = axml_buff.position();
     axml_buff.set_position(offset - 2);
 
-    /* Parse chunk header */
+    // Parse chunk header
     let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlEndElementType)
                  .expect("Error: cannot get header from start namespace chunk");
 
@@ -192,6 +197,7 @@ pub fn parse_end_element(axml_buff: &mut Cursor<Vec<u8>>,
     Ok(strings.get(name as usize).unwrap().to_string())
 }
 
+/// Handler for XML events
 pub fn handle_event<T> (writer: &mut Writer<T>,
                         element_name: String,
                         element_attrs: Vec<(String, String)>,
@@ -236,6 +242,7 @@ pub fn handle_event<T> (writer: &mut Writer<T>,
     }
 }
 
+/// Parse a whole XML document
 pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> Rc<RefCell<XmlElement>> {
     let mut global_strings = Vec::new();
     let mut namespace_prefixes = HashMap::<String, String>::new();
