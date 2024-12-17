@@ -24,7 +24,7 @@ use byteorder::{
 /// The data of the string pool is an array of `u32` that provides the
 /// indices in the pool. The pool itself is located at `strings_start`
 /// offset. Each item of the pool is composed of:
-///      - the string length (16 bits, more details lower)
+///      - the string length (16 bits, more details below)
 ///      - the string (in UTF-16 format)
 ///      - a terminator (`0x0000`)
 ///
@@ -174,5 +174,149 @@ impl StringPool {
             styles_offsets,
             strings
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::{ Cursor, Write };
+    use byteorder::{LittleEndian, WriteBytesExt};
+
+    // Helper function to create a simple buffer for testing
+    fn create_test_buffer() -> Cursor<Vec<u8>> {
+        let mut buf = Vec::new();
+
+        // Chunk header
+        buf.write_u16::<LittleEndian>(0x0001).unwrap(); // ChunkType::ResStringPoolType
+        buf.write_u16::<LittleEndian>(8).unwrap();      // Chunk header size
+        buf.write_u32::<LittleEndian>(128).unwrap();    // Chunk data size
+
+        // String pool header
+        buf.write_u32::<LittleEndian>(2).unwrap();      // string_count
+        buf.write_u32::<LittleEndian>(0).unwrap();      // style_count
+        buf.write_u32::<LittleEndian>(1).unwrap();      // flags (is_sorted, not is_utf8)
+        buf.write_u32::<LittleEndian>(36).unwrap();     // strings_start
+        buf.write_u32::<LittleEndian>(20).unwrap();     // styles_start
+        buf.write_u32::<LittleEndian>(0).unwrap();      // first string offset
+        buf.write_u32::<LittleEndian>(14).unwrap();     // second string offset
+
+        // Add mock string offsets and string data
+        buf.write_u16::<LittleEndian>(5).unwrap(); // Length of first string (UTF-16)
+        buf.write_u16::<LittleEndian>(0x0048).unwrap(); // 'H'
+        buf.write_u16::<LittleEndian>(0x0065).unwrap(); // 'e'
+        buf.write_u16::<LittleEndian>(0x006C).unwrap(); // 'l'
+        buf.write_u16::<LittleEndian>(0x006C).unwrap(); // 'l'
+        buf.write_u16::<LittleEndian>(0x006F).unwrap(); // 'o'
+        buf.write_u16::<LittleEndian>(0x0000).unwrap(); // Null terminator
+
+        buf.write_u16::<LittleEndian>(5).unwrap(); // Length of second string (UTF-16)
+        buf.write_u16::<LittleEndian>(0x0057).unwrap(); // 'W'
+        buf.write_u16::<LittleEndian>(0x006F).unwrap(); // 'o'
+        buf.write_u16::<LittleEndian>(0x0072).unwrap(); // 'r'
+        buf.write_u16::<LittleEndian>(0x006C).unwrap(); // 'l'
+        buf.write_u16::<LittleEndian>(0x0064).unwrap(); // 'd'
+        buf.write_u16::<LittleEndian>(0x0000).unwrap(); // Null terminator
+
+        Cursor::new(buf)
+    }
+
+    #[test]
+    fn test_string_pool_parse_utf16() {
+        // Create a test buffer
+        let mut buffer = create_test_buffer();
+
+        // The `from_buff` function assumes we have read the chunk type already
+        buffer.read_u16::<LittleEndian>().unwrap();
+
+        let mut global_strings = Vec::new();
+
+        // Parse string pool from buffer
+        let string_pool = StringPool::from_buff(&mut buffer, &mut global_strings);
+
+        // Validate that the string pool is parsed correctly
+        assert_eq!(string_pool.strings.len(), 2);
+        assert_eq!(string_pool.strings[0], "Hello");
+        assert_eq!(string_pool.strings[1], "World");
+    }
+
+    #[test]
+    fn test_string_pool_flags() {
+        let mut buffer = create_test_buffer();
+
+        // The `from_buff` function assumes we have read the chunk type already
+        buffer.read_u16::<LittleEndian>().unwrap();
+
+        let mut global_strings = Vec::new();
+
+        // Parse string pool from buffer
+        let string_pool = StringPool::from_buff(&mut buffer, &mut global_strings);
+
+        // Validate the flags
+        assert!(string_pool.is_sorted);
+        assert!(!string_pool.is_utf8);
+    }
+
+    #[test]
+    fn test_empty_pool() {
+        // Test case with no strings in the pool
+        let mut buf = Vec::new();
+
+        buf.write_u16::<LittleEndian>(0x0001).unwrap(); // ChunkType::ResStringPoolType
+        buf.write_u16::<LittleEndian>(8).unwrap();      // Chunk header size
+        buf.write_u32::<LittleEndian>(128).unwrap();    // Chunk data size
+
+        buf.write_u32::<LittleEndian>(0).unwrap(); // string_count = 0
+        buf.write_u32::<LittleEndian>(0).unwrap(); // style_count = 0
+        buf.write_u32::<LittleEndian>(0).unwrap(); // flags
+        buf.write_u32::<LittleEndian>(32).unwrap(); // strings_start
+        buf.write_u32::<LittleEndian>(20).unwrap(); // styles_start
+
+        let mut buffer = Cursor::new(buf);
+
+        // The `from_buff` function assumes we have read the chunk type already
+        buffer.read_u16::<LittleEndian>().unwrap();
+
+        let mut global_strings = Vec::new();
+
+        let string_pool = StringPool::from_buff(&mut buffer, &mut global_strings);
+
+        // Check that the string pool is correctly parsed and contains no strings
+        assert_eq!(string_pool.strings.len(), 0);
+    }
+
+    #[test]
+    fn test_utf8_string_parsing() {
+        // UTF-8 encoded string with length 5 (using mock data for simplicity)
+        let mut buf = Vec::new();
+
+        buf.write_u16::<LittleEndian>(0x0001).unwrap(); // ChunkType::ResStringPoolType
+        buf.write_u16::<LittleEndian>(8).unwrap();      // Chunk header size
+        buf.write_u32::<LittleEndian>(128).unwrap();    // Chunk data size
+
+        buf.write_u32::<LittleEndian>(1).unwrap();      // string_count = 1
+        buf.write_u32::<LittleEndian>(0).unwrap();      // style_count = 0
+        buf.write_u32::<LittleEndian>(256).unwrap();    // flags (not sorted, utf8)
+        buf.write_u32::<LittleEndian>(32).unwrap();     // strings_start
+        buf.write_u32::<LittleEndian>(20).unwrap();     // styles_start
+        buf.write_u32::<LittleEndian>(0).unwrap();      // Offset of the string
+
+        buf.write_u8(0x05).unwrap();                    // UTF-8 string length
+        buf.write_u8(0x05).unwrap();                    // UTF-8 string decoded length
+        buf.write_all(b"Hello").unwrap();          // UTF-8 string data
+        buf.write_u8(0x00).unwrap();                    // Null terminator
+
+        let mut buffer = Cursor::new(buf);
+
+        // The `from_buff` function assumes we have read the chunk type already
+        buffer.read_u16::<LittleEndian>().unwrap();
+
+        let mut global_strings = Vec::new();
+
+        let string_pool = StringPool::from_buff(&mut buffer, &mut global_strings);
+
+        // Validate that the string pool has correctly decoded the UTF-8 string
+        assert_eq!(string_pool.strings.len(), 1);
+        assert_eq!(string_pool.strings[0], "Hello");
     }
 }
