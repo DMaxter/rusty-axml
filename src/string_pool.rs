@@ -1,11 +1,17 @@
 #![allow(dead_code)]
 
+//! String pool
+//!
+//! The string pool is the set of strings used in the AXML files. All
+//! of these strings can be then referenced by the chunks. This reduces
+//! the size of the binary XML as there is no duplication of strings
+//! anymore.
+
 use crate::chunk_header::ChunkHeader;
 use crate::chunk_types::ChunkType;
 
 use std::io::{
     Read,
-    Error,
     Cursor,
 };
 use byteorder::{
@@ -13,95 +19,105 @@ use byteorder::{
     ReadBytesExt
 };
 
-/**
- * Header of a chunk representing a pool of strings
- *
- * Definition for a pool of strings.  The data of this chunk is an
- * array of uint32_t providing indices into the pool, relative to
- * stringsStart.  At stringsStart are all of the UTF-16 strings
- * concatenated together; each starts with a uint16_t of the string's
- * length and each ends with a 0x0000 terminator.  If a string is >
- * 32767 characters, the high bit of the length is set meaning to take
- * those 15 bits as a high word and it will be followed by another
- * uint16_t containing the low word.
- *
- * If styleCount is not zero, then immediately following the array of
- * uint32_t indices into the string table is another array of indices
- * into a style table starting at stylesStart.  Each entry in the
- * style table is an array of ResStringPool_span structures.
- */
+/// String pool structure
+///
+/// The data of the string pool is an array of `u32` that provides the
+/// indices in the pool. The pool itself is located at `strings_start`
+/// offset. Each item of the pool is composed of:
+///      - the string length (16 bits, more details lower)
+///      - the string (in UTF-16 format)
+///      - a terminator (`0x0000`)
+///
+/// The length is 16 bits long, but the system only uses 15 bits,
+/// which means that the maximum length of a string is 32,676
+/// characters. If a string has more than 32767 characters, the high
+/// bit of the length is set and the 15 remaining bits represent the
+/// high word of the total length. In this case, the length will be
+/// immediately followed by another 16 bits which represent the low
+/// end of the string length. This means the format allows for string
+/// lengths up to 2,147,483,648 characters.
+///
+/// If `style_count` is not zero, then immediately following the array
+/// of indices into the string table is another array of indices into
+/// a style table starting at `styles_start`. Each entry in the style
+/// table is an array of `string_pool_span` structures.
+///
+/// TODO: implement the `string_pool_span` struct
 #[derive(Debug)]
 pub struct StringPool {
-    /* Chunk header */
+    /// Chunk header
     header: ChunkHeader,
 
-    /* Number of strings in this pool (number of uint32_t indices that
-     * follow in the data). */
+    /// Number of strings in this pool (that is, number of `u32`
+    /// indices that follow in the data)
     string_count: u32,
 
-     /* Number of style span arrays in the pool (number of uint32_t
-      * indices follow the string indices). */
+    /// Number of style span arrays in the pool (that is, number
+    /// of `u32` indices follow the string indices)
     style_count: u32,
 
-    /* Flags. Can take two values:
-     *      - SORTED_FLAG = 1<<0,
-     *      - UTF8_FLAG = 1<<8
-     *
-     * If SORTED_FLAG is set, the string index is sorted by the string
-     * values (based on strcmp16()).
-     *
-     * If UTF8_FLAG is set, the string pool is ended in UTF-8.  */
-    flags: u32,
+    /// Flags. There are two possible flags:
+    ///     - `is_sorted`: if set, the string pool is sorted by
+    ///       UTF-16 string values
+    ///     - `is_utf8`: if set, the string pool is encoded in
+    ///       UTF-8 and not UTF-16
+    is_sorted: bool,
     is_utf8: bool,
 
-    /* Index from header of the string data. */
+    /// Offset from the header to the string data
     strings_start: u32,
 
-    /* Index from header of the style data. */
+    /// Offset from the header to the style data
     styles_start: u32,
 
+    /// List of strings offsets
     strings_offsets: Vec<u32>,
+
+    /// List of styles offsets
     styles_offsets: Vec<u32>,
+
+    /// The strings from the pool
     strings: Vec<String>,
 }
 
 impl StringPool {
-
+    /// Parse the string pool from the raw data
     pub fn from_buff(axml_buff: &mut Cursor<Vec<u8>>,
-                 global_strings: &mut Vec<String>) -> Result<Self, Error> {
+                 global_strings: &mut Vec<String>) -> Self {
 
-        /* Go back 2 bytes, to account from the block type */
+        // Go back 2 bytes, to account from the block type
         let initial_offset = axml_buff.position() - 2;
         axml_buff.set_position(initial_offset);
         let initial_offset = initial_offset as u32;
 
-        /* Parse chunk header */
+        // Parse chunk header
         let header = ChunkHeader::from_buff(axml_buff, ChunkType::ResStringPoolType)
                      .expect("Error: cannot get chunk header from string pool");
 
-        /* Get remaining members */
+        // Get remaining members
         let string_count = axml_buff.read_u32::<LittleEndian>().unwrap();
         let style_count = axml_buff.read_u32::<LittleEndian>().unwrap();
         let flags = axml_buff.read_u32::<LittleEndian>().unwrap();
+        let is_sorted = (flags & (1<<0)) != 0;
         let is_utf8 = (flags & (1<<8)) != 0;
         let strings_start = axml_buff.read_u32::<LittleEndian>().unwrap();
         let styles_start = axml_buff.read_u32::<LittleEndian>().unwrap();
 
-        /* Get strings offsets */
+        // Get strings offsets
         let mut strings_offsets = Vec::new();
         for _ in 0..string_count {
             let offset = axml_buff.read_u32::<LittleEndian>().unwrap();
             strings_offsets.push(offset);
         }
 
-        /* Get styles offsets */
+        // Get styles offsets
         let mut styles_offsets = Vec::new();
         for _ in 0..style_count {
             let offset = axml_buff.read_u32::<LittleEndian>().unwrap();
             styles_offsets.push(offset);
         }
 
-        /* Strings */
+        // Strings
         for offset in strings_offsets.iter() {
             // let current_start = (strings_start + offset + 8) as u64;
             let current_start = (initial_offset + strings_start + offset) as u64;
@@ -111,17 +127,17 @@ impl StringPool {
             let decoded_string;
 
             if is_utf8 {
-                /* NOTE for resources.arsc files
-                 *
-                 * Each String entry contains Length header (2 bytes to 4 bytes) + Actual String + [0x00]
-                 * Length header sometime contain duplicate values e.g. 20 20
-                 * Actual string sometime contains 00, which need to be ignored
-                 * Ending zero might be  2 byte or 4 byte
-                 *
-                 * TODO: Consider both Length bytes and String length > 32767 characters
-                 *
-                 * Actually, there are two length if the file is in UTF-8: the encoded and decoded lengths
-                 */
+                // NOTE for resources.arsc files
+                //
+                // Each String entry contains Length header (2 bytes to 4 bytes) + Actual String + [0x00]
+                // Length header sometime contain duplicate values e.g. 20 20
+                // Actual string sometime contains 00, which need to be ignored
+                // Ending zero might be  2 byte or 4 byte
+                //
+                // TODO: Consider both Length bytes and String length > 32767 characters
+                //
+                // Actually, there are two length if the file is in UTF-8: the encoded and decoded lengths
+                //
 
                 let _encoded_size = axml_buff.read_u8().unwrap() as u32;
                 str_size = axml_buff.read_u8().unwrap() as u32;
@@ -143,20 +159,20 @@ impl StringPool {
                 global_strings.push(decoded_string);
             }
         }
+
         let strings = global_strings.to_vec();
 
-        /* Build and return the object */
-        Ok(StringPool {
+        StringPool {
             header,
             string_count,
             style_count,
-            flags,
+            is_sorted,
             is_utf8,
             strings_start,
             styles_start,
             strings_offsets,
             styles_offsets,
             strings
-        })
+        }
     }
 }

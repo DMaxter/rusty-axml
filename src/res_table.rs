@@ -53,8 +53,7 @@ impl ResTable {
                             .expect("Error: cannot parse block type");
             match block_type {
                 ChunkType::ResStringPoolType => {
-                    StringPool::from_buff(axml_buff, &mut strings)
-                               .expect("Error: cannot parse string pool header");
+                    StringPool::from_buff(axml_buff, &mut strings);
                 },
                 ChunkType::ResTablePackageType => {
                     ResTablePackage::parse(axml_buff)
