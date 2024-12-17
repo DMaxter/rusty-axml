@@ -48,8 +48,8 @@ pub enum DataValueType {
 
 impl DataValueType {
     /// Convert `u8` into a `DataValueType` 
-    pub fn from_val(value: u8) -> Result<Self, ()> {
-        let data_value_type = match value {
+    pub fn from_val(value: u8) -> Self {
+        match value {
             0x00 => DataValueType::TypeNull,
             0x01 => DataValueType::TypeReference,
             0x02 => DataValueType::TypeAttribute,
@@ -67,8 +67,6 @@ impl DataValueType {
             0x1e => DataValueType::TypeIntColorArgb4,
             0x1f => DataValueType::TypeIntColorRgb4,
             _ => panic!("Error: unknown data value type {:02X}", value)
-        };
-
-        Ok(data_value_type)
+        }
     }
 }

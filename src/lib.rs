@@ -18,13 +18,11 @@ use std::io::{
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use crate::chunk_header::ChunkHeader;
 use crate::resource_map::ResourceMap;
 use crate::res_table::{
     ResTable
 };
 use crate::string_pool::StringPool;
-use crate::chunk_types::ChunkType;
 use crate::parser::XmlElement;
 
 /// Representation of an app's manifest contents
@@ -80,12 +78,6 @@ pub fn create_cursor_from_apk(file_path: &str) -> Cursor<Vec<u8>> {
         }
     };
     raw_file.read_to_end(&mut axml_cursor).expect("Error: cannot read manifest from app");
-    /*
-    } else {
-        let mut raw_file = fs::File::open(file_path).expect("Error: cannot open AXML file");
-        raw_file.read_to_end(&mut axml_cursor).expect("Error: cannot read AXML file");
-    }
-    */
 
     Cursor::new(axml_cursor)
 }
@@ -108,97 +100,6 @@ pub fn create_cursor_from_axml(file_path: &str) -> Cursor<Vec<u8>> {
 
 pub fn get_manifest_contents(axml_cursor: Cursor<Vec<u8>>) -> Rc<RefCell<XmlElement>> {
     parser::parse_xml(axml_cursor)
-}
-
-/// Parse an app's manifest and extract interesting contents
-/// For now, only these elements are extracted, although that
-/// list might get longer in the future:
-///
-///   * package name
-///   * list of activities names
-///   * list of services names
-///   * list of content providers names
-///   * list of broadcast receiver names
-fn REAL_get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) -> ManifestContents {
-    let mut contents = ManifestContents::default();
-
-    let mut global_strings = Vec::new();
-    let mut namespace_prefixes = HashMap::<String, String>::new();
-    // let mut writer = Vec::new();
-
-    loop {
-        if let Ok(block_type) = ChunkType::parse_block_type(&mut axml_cursor) {
-            match block_type {
-                ChunkType::ResNullType => continue,
-                ChunkType::ResStringPoolType => {
-                    let _ = StringPool::from_buff(&mut axml_cursor, &mut global_strings);
-                },
-                ChunkType::ResTableType => {
-                    let _ = ResTable::parse(&mut axml_cursor);
-                },
-                ChunkType::ResXmlType => {
-                    axml_cursor.set_position(axml_cursor.position() - 2);
-                    let _ = ChunkHeader::from_buff(&mut axml_cursor, ChunkType::ResXmlType);
-                },
-                ChunkType::ResXmlStartNamespaceType => {
-                    parser::parse_start_namespace(&mut axml_cursor, &global_strings, &mut namespace_prefixes);
-                },
-                ChunkType::ResXmlEndNamespaceType => {
-                    parser::parse_end_namespace(&mut axml_cursor, &global_strings);
-                },
-                ChunkType::ResXmlStartElementType => {
-                    let (element_type, attrs) = parser::parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
-
-                    // Get element name from the attributes
-                    // We only care about package name, activites, services, content providers and
-                    // broadcast receivers which all have their name in the "android" namespace
-                    let mut element_name = String::new();
-
-                    for (attr_key, attr_val) in attrs.iter() {
-                        if attr_key == "android:name" {
-                            element_name = attr_val.to_string();
-                            break;
-                        }
-                    }
-
-                    match element_type.as_str() {
-                        "activity" => contents.activities.push(element_name),
-                        "service"  => contents.services.push(element_name),
-                        "provider" => contents.providers.push(element_name),
-                        "receiver" => contents.receivers.push(element_name),
-                        "permission" => contents.created_perms.push(element_name),
-                        "uses-permission" => contents.requested_perms.push(element_name),
-                        "action" if element_name == "android.intent.action.MAIN" => contents.main_entry_point = contents.activities.last().cloned(),
-                        _ => { }
-                    }
-
-                    // Package name is in the "manifest" element and with the "package" key
-                    if element_type == "manifest" {
-                        for (attr_key, attr_val) in attrs.iter() {
-                            if attr_key == "package" {
-                                contents.pkg_name = attr_val.to_string();
-                                break;
-                            }
-                        }
-                    }
-                },
-                ChunkType::ResXmlEndElementType => {
-                    parser::parse_end_element(&mut axml_cursor, &global_strings).unwrap();
-                },
-
-                ChunkType::ResXmlResourceMapType => {
-                    let _ = ResourceMap::from_buff(&mut axml_cursor);
-                },
-
-                _ => { },
-            }
-        }
-        else  {
-            break;
-        }
-    }
-
-    contents
 }
 
 /// Use BFS tree traversal to get all element of a given type
@@ -226,14 +127,14 @@ fn find_elements_by_type(parsed_xml: &Rc<RefCell<XmlElement>>, element_type: &st
 /// filter, the assumption is that the compoennt is meants to be available to other apps, and so it
 /// is exported by default, otherwise not.
 fn is_component_exposed(component: &Rc<RefCell<XmlElement>>) -> bool {
-    let mut enabled_state = ComponentState::DefaultTrue;
+    let mut _enabled_state = ComponentState::DefaultTrue;
     let mut exported_state = ComponentState::Unknown;
 
     if let Some(enabled) = component.borrow().attributes.get("android:enabled") {
         if enabled == "false" {
             return false;
         } else {
-            enabled_state = ComponentState::ExplicitTrue;
+            _enabled_state = ComponentState::ExplicitTrue;
         }
     }
 
@@ -289,28 +190,28 @@ pub fn get_exposed_components(parsed_xml: Rc<RefCell<XmlElement>>) -> Option<Has
         String::from("activity"),
         find_elements_by_type(&parsed_xml, "activity")
                 .into_iter()
-                .filter(|item| is_component_exposed(&item))
+                .filter(is_component_exposed)
                 .collect()
     );
     components.insert(
         String::from("service"),
         find_elements_by_type(&parsed_xml, "service")
                 .into_iter()
-                .filter(|item| is_component_exposed(&item))
+                .filter(is_component_exposed)
                 .collect()
     );
     components.insert(
         String::from("provider"),
         find_elements_by_type(&parsed_xml, "provider")
                 .into_iter()
-                .filter(|item| is_component_exposed(&item))
+                .filter(is_component_exposed)
                 .collect()
     );
     components.insert(
         String::from("receiver"),
         find_elements_by_type(&parsed_xml, "receiver")
                 .into_iter()
-                .filter(|item| is_component_exposed(&item))
+                .filter(is_component_exposed)
                 .collect()
     );
 

@@ -81,7 +81,7 @@ pub fn parse_end_namespace(axml_buff: &mut Cursor<Vec<u8>>,
 /// Parser the start of an element
 pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
                            strings: &[String],
-                           namespace_prefixes: &HashMap::<String, String>) -> Result<(String, Vec<(String, String)>), Error> {
+                           namespace_prefixes: &HashMap::<String, String>) -> XmlElement {
     // Go back 2 bytes, to account from the block type
     let offset = axml_buff.position();
     axml_buff.set_position(offset - 2);
@@ -100,7 +100,9 @@ pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
     let _class_index = axml_buff.read_u16::<LittleEndian>().unwrap();
     let _style_index = axml_buff.read_u16::<LittleEndian>().unwrap();
 
-    let mut decoded_attrs = Vec::<(String, String)>::new();
+    let element_type = strings.get(name as usize).unwrap().to_string();
+
+    let mut decoded_attrs = HashMap::<String, String>::new();
     for _ in 0..attribute_count {
         let attr_namespace = axml_buff.read_u32::<LittleEndian>().unwrap();
         let attr_name = axml_buff.read_u32::<LittleEndian>().unwrap();
@@ -154,29 +156,18 @@ pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
                 DataValueType::TypeIntColorRgb4 => println!("TODO: DataValueType::TypeIntColorRgb4"),
             }
         }
-        decoded_attrs.push((decoded_attr_key, decoded_attr_val));
-    }
-
-    Ok((strings.get(name as usize).unwrap().to_string(), decoded_attrs))
-}
-
-/// Parser the start of an element
-pub fn NEW_parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
-                               strings: &[String],
-                               namespace_prefixes: &HashMap::<String, String>) -> XmlElement {
-    let (element_type, attrs) = parse_start_element(axml_buff, strings, namespace_prefixes).unwrap();
-    let mut attributes = HashMap::new();
-    for (key, value) in attrs.iter() {
-        attributes.insert(key.to_string(), value.to_string());
+        decoded_attrs.insert(
+                decoded_attr_key.to_string(),
+                decoded_attr_val.to_string()
+        );
     }
 
     XmlElement {
         element_type,
-        attributes,
+        attributes: decoded_attrs,
         children: Vec::new()
     }
 }
-
 
 /// Parser the end of an element
 pub fn parse_end_element(axml_buff: &mut Cursor<Vec<u8>>,
@@ -255,53 +246,48 @@ pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> Rc<RefCell<XmlElement>> {
     let mut stack = vec![Rc::clone(&root)];
     // let mut stack: Vec<Rc<RefCell<XmlElement>>> = Vec::new();
 
-    loop {
-        if let Ok(block_type) = ChunkType::parse_block_type(&mut axml_cursor) {
-            match block_type {
-                ChunkType::ResNullType => continue,
-                ChunkType::ResStringPoolType => {
-                    let _ = StringPool::from_buff(&mut axml_cursor, &mut global_strings);
-                },
-                ChunkType::ResTableType => {
-                    let _ = ResTable::parse(&mut axml_cursor);
-                },
-                ChunkType::ResXmlType => {
-                    axml_cursor.set_position(axml_cursor.position() - 2);
-                    let _ = ChunkHeader::from_buff(&mut axml_cursor, ChunkType::ResXmlType);
-                },
-                ChunkType::ResXmlStartNamespaceType => {
-                    parse_start_namespace(&mut axml_cursor, &global_strings, &mut namespace_prefixes);
-                },
-                ChunkType::ResXmlEndNamespaceType => {
-                    parse_end_namespace(&mut axml_cursor, &global_strings);
-                },
-                ChunkType::ResXmlStartElementType => {
-                    // let (element_type, attrs) = parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
-                    let element = NEW_parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes);
+    while let Ok(block_type) = ChunkType::parse_block_type(&mut axml_cursor) {
+        match block_type {
+            ChunkType::ResNullType => continue,
+            ChunkType::ResStringPoolType => {
+                let _ = StringPool::from_buff(&mut axml_cursor, &mut global_strings);
+            },
+            ChunkType::ResTableType => {
+                ResTable::parse(&mut axml_cursor);
+            },
+            ChunkType::ResXmlType => {
+                axml_cursor.set_position(axml_cursor.position() - 2);
+                let _ = ChunkHeader::from_buff(&mut axml_cursor, ChunkType::ResXmlType);
+            },
+            ChunkType::ResXmlStartNamespaceType => {
+                parse_start_namespace(&mut axml_cursor, &global_strings, &mut namespace_prefixes);
+            },
+            ChunkType::ResXmlEndNamespaceType => {
+                parse_end_namespace(&mut axml_cursor, &global_strings);
+            },
+            ChunkType::ResXmlStartElementType => {
+                // let (element_type, attrs) = parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
+                let element = parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes);
 
-                    if element.element_type == "manifest" {
-                        stack.last().unwrap().borrow_mut().attributes = element.attributes.clone();
-                    } else {
-                        let new_element = Rc::new(RefCell::new(element));
-                        stack.last().unwrap().borrow_mut().children.push(Rc::clone(&new_element));
-                        stack.push(new_element);
-                    }
+                if element.element_type == "manifest" {
+                    stack.last().unwrap().borrow_mut().attributes = element.attributes.clone();
+                } else {
+                    let new_element = Rc::new(RefCell::new(element));
+                    stack.last().unwrap().borrow_mut().children.push(Rc::clone(&new_element));
+                    stack.push(new_element);
+                }
 
-                },
-                ChunkType::ResXmlEndElementType => {
-                    let element_name = parse_end_element(&mut axml_cursor, &global_strings).unwrap();
-                    stack.pop();
-                },
+            },
+            ChunkType::ResXmlEndElementType => {
+                parse_end_element(&mut axml_cursor, &global_strings).unwrap();
+                stack.pop();
+            },
 
-                ChunkType::ResXmlResourceMapType => {
-                    let _ = ResourceMap::from_buff(&mut axml_cursor);
-                },
+            ChunkType::ResXmlResourceMapType => {
+                let _ = ResourceMap::from_buff(&mut axml_cursor);
+            },
 
-                _ => { },
-            }
-        }
-        else  {
-            break;
+            _ => { },
         }
     }
 
