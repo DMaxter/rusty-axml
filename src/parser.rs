@@ -22,7 +22,7 @@ use quick_xml::events::{Event, BytesEnd, BytesStart};
 use quick_xml::events::attributes::Attribute;
 use quick_xml::name::QName;
 
-use crate::xml_types::XmlTypes;
+use crate::chunk_types::ChunkType;
 use crate::chunk_header::ChunkHeader;
 use crate::data_value_type::DataValueType;
 use crate::res_value::ResValue;
@@ -48,7 +48,7 @@ pub fn parse_start_namespace(axml_buff: &mut Cursor<Vec<u8>>,
     axml_buff.set_position(offset - 2);
 
     // Parse chunk header
-    let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlStartNamespaceType)
+    let _header = ChunkHeader::from_buff(axml_buff, ChunkType::ResXmlStartNamespaceType)
                  .expect("Error: cannot get header from start namespace chunk");
 
     let _line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
@@ -69,7 +69,7 @@ pub fn parse_end_namespace(axml_buff: &mut Cursor<Vec<u8>>,
     axml_buff.set_position(offset - 2);
 
     // Parse chunk header
-    let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlEndNamespaceType)
+    let _header = ChunkHeader::from_buff(axml_buff, ChunkType::ResXmlEndNamespaceType)
                  .expect("Error: cannot get header from start namespace chunk");
 
     let _line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
@@ -87,7 +87,7 @@ pub fn parse_start_element(axml_buff: &mut Cursor<Vec<u8>>,
     axml_buff.set_position(offset - 2);
 
     // Parse chunk header
-    let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlStartElementType)
+    let _header = ChunkHeader::from_buff(axml_buff, ChunkType::ResXmlStartElementType)
                  .expect("Error: cannot get header from start namespace chunk");
 
     let _line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
@@ -186,7 +186,7 @@ pub fn parse_end_element(axml_buff: &mut Cursor<Vec<u8>>,
     axml_buff.set_position(offset - 2);
 
     // Parse chunk header
-    let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlEndElementType)
+    let _header = ChunkHeader::from_buff(axml_buff, ChunkType::ResXmlEndElementType)
                  .expect("Error: cannot get header from start namespace chunk");
 
     let _line_number = axml_buff.read_u32::<LittleEndian>().unwrap();
@@ -202,9 +202,9 @@ pub fn handle_event<T> (writer: &mut Writer<T>,
                         element_name: String,
                         element_attrs: Vec<(String, String)>,
                         namespace_prefixes: &HashMap::<String, String>,
-                        block_type: XmlTypes) where T: std::io::Write {
+                        block_type: ChunkType) where T: std::io::Write {
     match block_type {
-        XmlTypes::ResXmlStartElementType => {
+        ChunkType::ResXmlStartElementType => {
             // let mut elem = BytesStart::from_content(element_name.as_bytes(), element_name.len());
             let mut elem = BytesStart::new(&element_name);
 
@@ -235,7 +235,7 @@ pub fn handle_event<T> (writer: &mut Writer<T>,
             assert!(writer.write_event(Event::Start(elem)).is_ok());
 
         },
-        XmlTypes::ResXmlEndElementType => {
+        ChunkType::ResXmlEndElementType => {
             assert!(writer.write_event(Event::End(BytesEnd::new(element_name))).is_ok());
         },
         _ => println!("{:02X}, other", block_type),
@@ -256,26 +256,26 @@ pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> Rc<RefCell<XmlElement>> {
     // let mut stack: Vec<Rc<RefCell<XmlElement>>> = Vec::new();
 
     loop {
-        if let Ok(block_type) = XmlTypes::parse_block_type(&mut axml_cursor) {
+        if let Ok(block_type) = ChunkType::parse_block_type(&mut axml_cursor) {
             match block_type {
-                XmlTypes::ResNullType => continue,
-                XmlTypes::ResStringPoolType => {
+                ChunkType::ResNullType => continue,
+                ChunkType::ResStringPoolType => {
                     let _ = StringPool::from_buff(&mut axml_cursor, &mut global_strings);
                 },
-                XmlTypes::ResTableType => {
+                ChunkType::ResTableType => {
                     let _ = ResTable::parse(&mut axml_cursor);
                 },
-                XmlTypes::ResXmlType => {
+                ChunkType::ResXmlType => {
                     axml_cursor.set_position(axml_cursor.position() - 2);
-                    let _ = ChunkHeader::from_buff(&mut axml_cursor, XmlTypes::ResXmlType);
+                    let _ = ChunkHeader::from_buff(&mut axml_cursor, ChunkType::ResXmlType);
                 },
-                XmlTypes::ResXmlStartNamespaceType => {
+                ChunkType::ResXmlStartNamespaceType => {
                     parse_start_namespace(&mut axml_cursor, &global_strings, &mut namespace_prefixes);
                 },
-                XmlTypes::ResXmlEndNamespaceType => {
+                ChunkType::ResXmlEndNamespaceType => {
                     parse_end_namespace(&mut axml_cursor, &global_strings);
                 },
-                XmlTypes::ResXmlStartElementType => {
+                ChunkType::ResXmlStartElementType => {
                     // let (element_type, attrs) = parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
                     let element = NEW_parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes);
 
@@ -288,12 +288,12 @@ pub fn parse_xml(mut axml_cursor: Cursor<Vec<u8>>) -> Rc<RefCell<XmlElement>> {
                     }
 
                 },
-                XmlTypes::ResXmlEndElementType => {
+                ChunkType::ResXmlEndElementType => {
                     let element_name = parse_end_element(&mut axml_cursor, &global_strings).unwrap();
                     stack.pop();
                 },
 
-                XmlTypes::ResXmlResourceMapType => {
+                ChunkType::ResXmlResourceMapType => {
                     let _ = ResourceMap::from_buff(&mut axml_cursor);
                 },
 

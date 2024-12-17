@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::chunk_header::ChunkHeader;
-use crate::xml_types::XmlTypes;
+use crate::chunk_types::ChunkType;
 
 use std::io::{
     Read,
@@ -76,7 +76,7 @@ impl StringPool {
         let initial_offset = initial_offset as u32;
 
         /* Parse chunk header */
-        let header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResStringPoolType)
+        let header = ChunkHeader::from_buff(axml_buff, ChunkType::ResStringPoolType)
                      .expect("Error: cannot get chunk header from string pool");
 
         /* Get remaining members */

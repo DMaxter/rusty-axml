@@ -10,7 +10,7 @@ use byteorder::{
 
 /* Type identifiers for chunks. Only includes the ones related to XML */
 #[derive(Clone, Copy, PartialEq, Debug)]
-pub enum XmlTypes {
+pub enum ChunkType {
     ResNullType                 = 0x0000,
     ResStringPoolType           = 0x0001,
     ResTableType                = 0x0002,
@@ -38,7 +38,7 @@ pub enum XmlTypes {
     ResTableLibraryType         = 0x0203
 }
 
-impl XmlTypes {
+impl ChunkType {
     pub fn parse_block_type(buff: &mut Cursor<Vec<u8>>) -> Result<Self, Error> {
         let raw_block_type = buff.read_u16::<LittleEndian>();
         let raw_block_type = match raw_block_type {
@@ -47,30 +47,30 @@ impl XmlTypes {
         };
 
         let block_type = match raw_block_type {
-            0x0000 => XmlTypes::ResNullType,
-            0x0001 => XmlTypes::ResStringPoolType,
-            0x0002 => XmlTypes::ResTableType,
-            0x0003 => XmlTypes::ResXmlType,
+            0x0000 => ChunkType::ResNullType,
+            0x0001 => ChunkType::ResStringPoolType,
+            0x0002 => ChunkType::ResTableType,
+            0x0003 => ChunkType::ResXmlType,
 
             /* Chunk types in RES_XML_TYPE */
             // TODO: see comment above.
-            // 0x0100 => XmlTypes::ResXmlFirstChunkType,
-            0x0100 => XmlTypes::ResXmlStartNamespaceType,
-            0x0101 => XmlTypes::ResXmlEndNamespaceType,
-            0x0102 => XmlTypes::ResXmlStartElementType,
-            0x0103 => XmlTypes::ResXmlEndElementType,
-            0x0104 => XmlTypes::ResXmlCDataType,
-            0x017f => XmlTypes::ResXmlLastChunkType,
+            // 0x0100 => ChunkType::ResXmlFirstChunkType,
+            0x0100 => ChunkType::ResXmlStartNamespaceType,
+            0x0101 => ChunkType::ResXmlEndNamespaceType,
+            0x0102 => ChunkType::ResXmlStartElementType,
+            0x0103 => ChunkType::ResXmlEndElementType,
+            0x0104 => ChunkType::ResXmlCDataType,
+            0x017f => ChunkType::ResXmlLastChunkType,
 
             /* This contains a uint32_t array mapping strings in the string
              * pool back to resource identifiers. It is optional. */
-            0x0180 => XmlTypes::ResXmlResourceMapType,
+            0x0180 => ChunkType::ResXmlResourceMapType,
 
             /* Chunk types in RES_TABLE_TYPE */
-            0x0200 => XmlTypes::ResTablePackageType,
-            0x0201 => XmlTypes::ResTableTypeType,
-            0x0202 => XmlTypes::ResTableTypeSpecType,
-            0x0203 => XmlTypes::ResTableLibraryType,
+            0x0200 => ChunkType::ResTablePackageType,
+            0x0201 => ChunkType::ResTableTypeType,
+            0x0202 => ChunkType::ResTableTypeSpecType,
+            0x0203 => ChunkType::ResTableLibraryType,
 
             /* If we find an unknown type, we stop and panic */
             _ => panic!("Error: unknown block type {:02X}", raw_block_type)
@@ -80,30 +80,30 @@ impl XmlTypes {
     }
 }
 
-/* Implementation of the UpperHex trait for XmlTypes */
-impl fmt::UpperHex for XmlTypes {
+/* Implementation of the UpperHex trait for ChunkType */
+impl fmt::UpperHex for ChunkType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            XmlTypes::ResNullType => write!(f, "{:X}", 0x0000),
-            XmlTypes::ResStringPoolType => write!(f, "{:X}", 0x0001),
-            XmlTypes::ResTableType => write!(f, "{:X}", 0x0002),
-            XmlTypes::ResXmlType => write!(f, "{:X}", 0x0003),
+            ChunkType::ResNullType => write!(f, "{:X}", 0x0000),
+            ChunkType::ResStringPoolType => write!(f, "{:X}", 0x0001),
+            ChunkType::ResTableType => write!(f, "{:X}", 0x0002),
+            ChunkType::ResXmlType => write!(f, "{:X}", 0x0003),
 
             // TODO: see comment above.
-            // XmlTypes::ResXmlFirstChunkType => write!(f, "{:X}", 0x0100),
-            XmlTypes::ResXmlStartNamespaceType => write!(f, "{:X}", 0x0100),
-            XmlTypes::ResXmlEndNamespaceType => write!(f, "{:X}", 0x0101),
-            XmlTypes::ResXmlStartElementType => write!(f, "{:X}", 0x0102),
-            XmlTypes::ResXmlEndElementType => write!(f, "{:X}", 0x0103),
-            XmlTypes::ResXmlCDataType => write!(f, "{:X}", 0x0104),
-            XmlTypes::ResXmlLastChunkType => write!(f, "{:X}", 0x017f),
+            // ChunkType::ResXmlFirstChunkType => write!(f, "{:X}", 0x0100),
+            ChunkType::ResXmlStartNamespaceType => write!(f, "{:X}", 0x0100),
+            ChunkType::ResXmlEndNamespaceType => write!(f, "{:X}", 0x0101),
+            ChunkType::ResXmlStartElementType => write!(f, "{:X}", 0x0102),
+            ChunkType::ResXmlEndElementType => write!(f, "{:X}", 0x0103),
+            ChunkType::ResXmlCDataType => write!(f, "{:X}", 0x0104),
+            ChunkType::ResXmlLastChunkType => write!(f, "{:X}", 0x017f),
 
-            XmlTypes::ResXmlResourceMapType => write!(f, "{:X}", 0x0180),
+            ChunkType::ResXmlResourceMapType => write!(f, "{:X}", 0x0180),
 
-            XmlTypes::ResTablePackageType => write!(f, "{:X}", 0x0200),
-            XmlTypes::ResTableTypeType => write!(f, "{:X}", 0x0201),
-            XmlTypes::ResTableTypeSpecType => write!(f, "{:X}", 0x0202),
-            XmlTypes::ResTableLibraryType => write!(f, "{:X}", 0x0203),
+            ChunkType::ResTablePackageType => write!(f, "{:X}", 0x0200),
+            ChunkType::ResTableTypeType => write!(f, "{:X}", 0x0201),
+            ChunkType::ResTableTypeSpecType => write!(f, "{:X}", 0x0202),
+            ChunkType::ResTableLibraryType => write!(f, "{:X}", 0x0203),
         }?;
         Ok(())
     }

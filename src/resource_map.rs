@@ -3,7 +3,7 @@
 //! AXML resource maps
 
 use crate::chunk_header::ChunkHeader;
-use crate::xml_types::XmlTypes;
+use crate::chunk_types::ChunkType;
 
 use std::io::{
     Error,
@@ -33,7 +33,7 @@ impl ResourceMap {
         axml_buff.set_position(offset - 2);
 
         /* Parse chunk header */
-        let header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResXmlResourceMapType)
+        let header = ChunkHeader::from_buff(axml_buff, ChunkType::ResXmlResourceMapType)
                      .expect("Error: cannot get chunk header from string pool");
 
         /* Get resources IDs */

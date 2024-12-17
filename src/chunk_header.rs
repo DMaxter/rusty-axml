@@ -4,7 +4,7 @@
 //!
 //! An AXML document is composed of several chunks, and each chunk has a header.
 //! The header is rather small and only contain the type of the chunk (identified
-//! by the `XmlTypes` enum), the header size, and the chunk size.
+//! by the `ChunkType` enum), the header size, and the chunk size.
 
 use std::io::{
     Error,
@@ -14,14 +14,14 @@ use byteorder::{
     LittleEndian,
     ReadBytesExt,
 };
-use crate::xml_types::XmlTypes;
+use crate::chunk_types::ChunkType;
 
 /// Header that appears at the beginning of every chunk
 #[derive(Debug)]
 pub struct ChunkHeader {
     /// Type identifier for this chunk.
     /// The meaning of this value depends on the containing chunk.
-    pub chunk_type: XmlTypes,
+    pub chunk_type: ChunkType,
 
     /// Size of the chunk header in bytes.
     pub header_size: u16,
@@ -32,12 +32,12 @@ pub struct ChunkHeader {
 
 impl ChunkHeader {
     /// Parse bytes from given buffer into a `ChunkHeader`
-    pub fn from_buff(axml_buff: &mut Cursor<Vec<u8>>, expected_type: XmlTypes) -> Result<Self, Error> {
+    pub fn from_buff(axml_buff: &mut Cursor<Vec<u8>>, expected_type: ChunkType) -> Result<Self, Error> {
         // Minimum size, for a chunk with no data
         let minimum_size = 8;
 
         // Get chunk type
-        let chunk_type = XmlTypes::parse_block_type(axml_buff)
+        let chunk_type = ChunkType::parse_block_type(axml_buff)
                         .expect("Error: cannot parse block type");
 
         // Check if this is indeed of the expected type
@@ -82,14 +82,14 @@ impl ChunkHeader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use XmlTypes;
+    use ChunkType;
 
     #[test]
     fn test_valid_case() {
         let valid_data = vec![1, 0, 8, 0, 16, 0, 0, 0];
         let mut cursor = Cursor::new(valid_data);
 
-        let expected_type = XmlTypes::ResStringPoolType;
+        let expected_type = ChunkType::ResStringPoolType;
         let result = ChunkHeader::from_buff(&mut cursor, expected_type);
 
         assert!(result.is_ok());
@@ -106,7 +106,7 @@ mod tests {
         let invalid_data = vec![2, 0, 8, 0, 16, 0, 0, 0];
         let mut cursor = Cursor::new(invalid_data);
 
-        let expected_type = XmlTypes::ResStringPoolType;
+        let expected_type = ChunkType::ResStringPoolType;
         let _ = ChunkHeader::from_buff(&mut cursor, expected_type);
     }
 
@@ -117,7 +117,7 @@ mod tests {
         let invalid_data = vec![1, 0, 4, 0, 16, 0, 0, 0];
         let mut cursor = Cursor::new(invalid_data);
 
-        let expected_type = XmlTypes::ResStringPoolType;
+        let expected_type = ChunkType::ResStringPoolType;
         let _ = ChunkHeader::from_buff(&mut cursor, expected_type);
     }
 
@@ -128,7 +128,7 @@ mod tests {
         let invalid_data = vec![1, 0, 8, 0, 4, 0, 0, 0];
         let mut cursor = Cursor::new(invalid_data);
 
-        let expected_type = XmlTypes::ResStringPoolType;
+        let expected_type = ChunkType::ResStringPoolType;
         let _ = ChunkHeader::from_buff(&mut cursor, expected_type);
     }
 
@@ -143,7 +143,7 @@ mod tests {
         let invalid_data = vec![1, 0, 16, 0, 8, 0, 0, 0];
         let mut cursor = Cursor::new(invalid_data);
 
-        let expected_type = XmlTypes::ResStringPoolType;
+        let expected_type = ChunkType::ResStringPoolType;
         let _ = ChunkHeader::from_buff(&mut cursor, expected_type);
     }
 }

@@ -1,5 +1,5 @@
 pub mod parser;
-pub mod xml_types;
+pub mod chunk_types;
 pub mod chunk_header;
 pub mod string_pool;
 pub mod resource_map;
@@ -24,7 +24,7 @@ use crate::res_table::{
     ResTable
 };
 use crate::string_pool::StringPool;
-use crate::xml_types::XmlTypes;
+use crate::chunk_types::ChunkType;
 use crate::parser::XmlElement;
 
 /// Representation of an app's manifest contents
@@ -127,26 +127,26 @@ fn REAL_get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) -> ManifestConte
     // let mut writer = Vec::new();
 
     loop {
-        if let Ok(block_type) = XmlTypes::parse_block_type(&mut axml_cursor) {
+        if let Ok(block_type) = ChunkType::parse_block_type(&mut axml_cursor) {
             match block_type {
-                XmlTypes::ResNullType => continue,
-                XmlTypes::ResStringPoolType => {
+                ChunkType::ResNullType => continue,
+                ChunkType::ResStringPoolType => {
                     let _ = StringPool::from_buff(&mut axml_cursor, &mut global_strings);
                 },
-                XmlTypes::ResTableType => {
+                ChunkType::ResTableType => {
                     let _ = ResTable::parse(&mut axml_cursor);
                 },
-                XmlTypes::ResXmlType => {
+                ChunkType::ResXmlType => {
                     axml_cursor.set_position(axml_cursor.position() - 2);
-                    let _ = ChunkHeader::from_buff(&mut axml_cursor, XmlTypes::ResXmlType);
+                    let _ = ChunkHeader::from_buff(&mut axml_cursor, ChunkType::ResXmlType);
                 },
-                XmlTypes::ResXmlStartNamespaceType => {
+                ChunkType::ResXmlStartNamespaceType => {
                     parser::parse_start_namespace(&mut axml_cursor, &global_strings, &mut namespace_prefixes);
                 },
-                XmlTypes::ResXmlEndNamespaceType => {
+                ChunkType::ResXmlEndNamespaceType => {
                     parser::parse_end_namespace(&mut axml_cursor, &global_strings);
                 },
-                XmlTypes::ResXmlStartElementType => {
+                ChunkType::ResXmlStartElementType => {
                     let (element_type, attrs) = parser::parse_start_element(&mut axml_cursor, &global_strings, &namespace_prefixes).unwrap();
 
                     // Get element name from the attributes
@@ -182,11 +182,11 @@ fn REAL_get_manifest_contents(mut axml_cursor: Cursor<Vec<u8>>) -> ManifestConte
                         }
                     }
                 },
-                XmlTypes::ResXmlEndElementType => {
+                ChunkType::ResXmlEndElementType => {
                     parser::parse_end_element(&mut axml_cursor, &global_strings).unwrap();
                 },
 
-                XmlTypes::ResXmlResourceMapType => {
+                ChunkType::ResXmlResourceMapType => {
                     let _ = ResourceMap::from_buff(&mut axml_cursor);
                 },
 

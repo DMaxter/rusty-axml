@@ -2,7 +2,7 @@
 
 use crate::chunk_header::ChunkHeader;
 use crate::string_pool::StringPool;
-use crate::xml_types::XmlTypes;
+use crate::chunk_types::ChunkType;
 
 use std::io::{
     Error,
@@ -41,7 +41,7 @@ impl ResTable {
         axml_buff.set_position(initial_offset - 2);
 
         /* Parse chunk header */
-        let _header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResTableType)
+        let _header = ChunkHeader::from_buff(axml_buff, ChunkType::ResTableType)
                      .expect("Error: cannot get chunk header from string pool");
 
         /* Get package count */
@@ -49,14 +49,14 @@ impl ResTable {
 
         let mut strings = Vec::<String>::new();
         for _ in 0..package_count {
-            let block_type = XmlTypes::parse_block_type(axml_buff)
+            let block_type = ChunkType::parse_block_type(axml_buff)
                             .expect("Error: cannot parse block type");
             match block_type {
-                XmlTypes::ResStringPoolType => {
+                ChunkType::ResStringPoolType => {
                     StringPool::from_buff(axml_buff, &mut strings)
                                .expect("Error: cannot parse string pool header");
                 },
-                XmlTypes::ResTablePackageType => {
+                ChunkType::ResTablePackageType => {
                     ResTablePackage::parse(axml_buff)
                                     .expect("Error: cannot parse table package");
                 },
@@ -114,7 +114,7 @@ impl ResTablePackage {
         /* Parse chunk header */
         // let header = ResTable::from_buff(axml_buff)
         //              .expect("Error: cannot parse resource table header from string pool");
-        let header = ChunkHeader::from_buff(axml_buff, XmlTypes::ResTablePackageType)
+        let header = ChunkHeader::from_buff(axml_buff, ChunkType::ResTablePackageType)
                      .expect("Error: cannot get chunk header for ResTablePackage");
         // let header = ChunkHeader { chunk_type: 0x0, header_size: 0x0, size: 0x0 };
 
