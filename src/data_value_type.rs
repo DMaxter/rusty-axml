@@ -1,5 +1,3 @@
-use std::io::Error;
-
 /// Data value types
 ///
 /// Note: we ignore `TypeFirstInt`, `TypeFirstColorInt`, and `TypeLastColorInt` which hold the same values
@@ -27,7 +25,8 @@ pub enum DataValueType {
     /// be used like a TYPE_ATTRIBUTE
     TypeDynamicAttribute	= 0x08,
 
-    /// Beginning of integer flavors...
+    /// Integers
+    ///
     /// The data is a raw integer value of the form `n..n`
     TypeIntDec	            = 0x10,
     /// The data is a raw integer value of the form `0xn..n`
@@ -35,7 +34,8 @@ pub enum DataValueType {
     /// The data is either 0 or 1, for input `false` or `true` respectively
     TypeIntBoolean	        = 0x12,
 
-    /// Beginning of color integer flavors...
+    /// Colors
+    ///
     /// The 'data' is a raw integer value of the form `#aarrggbb`
     TypeIntColorArgb8		= 0x1c,
     /// The 'data' is a raw integer value of the form `#rrggbb`
@@ -48,7 +48,7 @@ pub enum DataValueType {
 
 impl DataValueType {
     /// Convert `u8` into a `DataValueType` 
-    pub fn from_val(value: u8) -> Result<Self, Error> {
+    pub fn from_val(value: u8) -> Result<Self, ()> {
         let data_value_type = match value {
             0x00 => DataValueType::TypeNull,
             0x01 => DataValueType::TypeReference,
